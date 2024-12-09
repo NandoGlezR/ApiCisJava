@@ -1,0 +1,20 @@
+services:
+  user:
+    image: user-api
+    container_name: user-container
+    restart: no
+    ports:
+      - "8082:8081"
+    environment:
+      - SPRING_EMAIL_USERNAME=
+      - SPRING_EMAIL_HOST=
+      - SPRING_EMAIL_PORT=
+      - SPRING_EMAIL_PASSWORD=
+      - SPRING_DATASOURCE_URI=
+      - JWT_SECRET_KEY=
+    networks:
+      - api-network
+
+networks:
+  api-network:
+    external: true

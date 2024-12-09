@@ -1,7 +1,5 @@
 package com.jala.university.api.application.service.impl;
 
-import com.jala.university.api.application.dto.IdentityValidationTokenDto;
-import com.jala.university.api.application.dto.UserDto;
 import com.jala.university.api.application.mapper.impl.UserMapper;
 import com.jala.university.api.application.service.EmailService;
 import com.jala.university.api.application.service.ResetPasswordService;
@@ -9,7 +7,6 @@ import com.jala.university.api.application.service.TokenService;
 import com.jala.university.api.application.service.ValidationService;
 import com.jala.university.api.domain.exceptions.format.InvalidEmailFormatException;
 import com.jala.university.api.domain.exceptions.format.InvalidPasswordFormatException;
-import com.jala.university.api.domain.exceptions.user.UserNotFoundException;
 import com.jala.university.api.domain.repository.UserRepository;
 import jakarta.mail.MessagingException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,20 +42,13 @@ public class ResetPasswordServiceImpl implements ResetPasswordService {
     if (!validationService.isValidEmail(email)) {
       throw new InvalidEmailFormatException(email);
     }
-
-    IdentityValidationTokenDto token = null;
-    UserDto user = UserDto.builder()
-        .email(email)
-        .build();
-
-    try {
-      token = tokenService.createToken(LocalDateTime.now().plusHours(expirationTimeTokenInHours), user);
-    } catch (UserNotFoundException e) {
+    var user = userRepository.findByLogin(email);
+    if (user == null) {
       return false;
     }
 
+    var token = tokenService.createToken(LocalDateTime.now().plusHours(expirationTimeTokenInHours), userMapper.mapTo(user));
     emailService.sendEmail(email, "Reset password", token.getToken().toString());
-
     return true;
   }
 
@@ -71,13 +61,11 @@ public class ResetPasswordServiceImpl implements ResetPasswordService {
       return false;
     }
 
-    var optionalUser = tokenService.getUserWithToken(token);
-    var user = optionalUser.get();
+    var identityToken = tokenService.getToken(token);
+    var user = identityToken.get().getUser();
     String encryptPassword = passwordEncoder.encode(password);
-
     user.setPassword(encryptPassword);
     userRepository.save(userMapper.mapFrom(user));
-
     return true;
   }
 }

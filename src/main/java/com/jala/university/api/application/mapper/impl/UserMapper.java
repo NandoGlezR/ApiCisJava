@@ -21,7 +21,6 @@ public class UserMapper implements Mapper<User, UserDto> {
     .name(userDto.getName())
     .login(userDto.getEmail())
     .password(userDto.getPassword())
-    .validated(userDto.isValidated())
     .build();
   }
 
@@ -38,7 +37,6 @@ public class UserMapper implements Mapper<User, UserDto> {
     .name(entity.getName())
     .email(entity.getLogin())
     .password(entity.getPassword())
-    .validated(entity.isValidated())
     .build();
   }
 }

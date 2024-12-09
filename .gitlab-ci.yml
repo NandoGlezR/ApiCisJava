@@ -1,12 +1,8 @@
 stages:
   - build
   - test
-  - publish
-  - deploy
 
 variables:
-  TAG_LATEST: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_NAME:latest
-  TAG_COMMIT: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_NAME:$CI_COMMIT_SHORT_SHA
   MAVEN_OPTS: >-
     -Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository
 
@@ -37,40 +33,3 @@ test:
     - merge_request
   dependencies:
     - build
-
-
-publish:
-  only:
-    - main
-    - migration/mongo
-  image: docker:latest
-  stage: publish
-  services:
-    - docker:dind
-  script:
-    - docker build -t $TAG_COMMIT -t $TAG_LATEST .
-    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
-    - docker push $TAG_COMMIT
-    - docker push $TAG_LATEST
-
-deploy:
-  only:
-    - main
-    - migration/mongo
-  image: alpine:latest
-  stage: deploy
-  tags:
-    - deployment
-  script:
-    - chmod go= $ID_RSA
-    - apk update && apk add openssh-client
-    - ssh -i $ID_RSA -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP "docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY"
-    - ssh -i $ID_RSA -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP "docker pull $TAG_COMMIT"
-    - ssh -i $ID_RSA -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP "docker container rm -f user-api || true"
-    - ssh -i $ID_RSA -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP "docker run -d --network api-network --name user-api -p 8082:8081 
-      -e SPRING_DATASOURCE_URI='$DATASOURCE_URI'
-      -e SPRING_EMAIL_USERNAME='$EMAIL_USERNAME'
-      -e SPRING_EMAIL_HOST='$EMAIL_HOST'
-      -e SPRING_EMAIL_PORT='$EMAIL_PORT'
-      -e SPRING_EMAIL_PASSWORD='$EMAIL_PASSWORD'
-      -e JWT_SECRET_KEY='$ACCESS_KEY' $TAG_COMMIT"

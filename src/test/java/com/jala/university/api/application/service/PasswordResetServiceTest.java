@@ -7,7 +7,6 @@ import com.jala.university.api.application.service.impl.ResetPasswordServiceImpl
 import com.jala.university.api.domain.entity.User;
 import com.jala.university.api.domain.exceptions.format.InvalidEmailFormatException;
 import com.jala.university.api.domain.exceptions.format.InvalidPasswordFormatException;
-import com.jala.university.api.domain.exceptions.user.UserNotFoundException;
 import com.jala.university.api.domain.repository.UserRepository;
 import jakarta.mail.MessagingException;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,23 +63,20 @@ public class PasswordResetServiceTest {
   }
 
   @Test
-  public void testSendPasswordResetEmail_UserNotFound()
-      throws MessagingException, InvalidEmailFormatException, UserNotFoundException {
+  public void testSendPasswordResetEmail_UserNotFound() throws MessagingException, InvalidEmailFormatException {
     String validEmail = "user@example.com";
 
     when(validationService.isValidEmail(validEmail)).thenReturn(true);
     when(userRepository.findByLogin(validEmail)).thenReturn(null);
-    when(tokenService.createToken(any(), any())).thenThrow(new UserNotFoundException());
 
     boolean result = resetPasswordServicesImpl.sendPasswordResetEmail(validEmail);
 
     assertFalse(result);
-    verify(tokenService).createToken(any(), any());
+    verify(userRepository).findByLogin(validEmail);
   }
 
   @Test
-  public void testSendPasswordResetEmail_Success()
-      throws MessagingException, InvalidEmailFormatException, UserNotFoundException {
+  public void testSendPasswordResetEmail_Success() throws MessagingException, InvalidEmailFormatException {
     String validEmail = "user@example.com";
     var user = mock(User.class); // Mock del UserDto
     var token = mock(IdentityValidationTokenDto.class); // Mock del token
@@ -88,7 +84,7 @@ public class PasswordResetServiceTest {
     when(validationService.isValidEmail(validEmail)).thenReturn(true);
     when(userRepository.findByLogin(validEmail)).thenReturn(user);
     when(tokenService.createToken(any(LocalDateTime.class), any(UserDto.class))).thenReturn(token);
-    when(token.getToken()).thenReturn(String.valueOf(UUID.randomUUID()));
+    when(token.getToken()).thenReturn(UUID.randomUUID());
 
     boolean result = resetPasswordServicesImpl.sendPasswordResetEmail(validEmail);
 
@@ -124,9 +120,11 @@ public class PasswordResetServiceTest {
     UUID validToken = UUID.randomUUID();
     String newPassword = "n3w_Password";
     var user = mock(UserDto.class);
+    var identityToken = mock(IdentityValidationTokenDto.class);
 
     when(tokenService.verifyToken(validToken)).thenReturn(true);
-    when(tokenService.getUserWithToken(validToken)).thenReturn(Optional.of(user));
+    when(tokenService.getToken(validToken)).thenReturn(Optional.of(identityToken));
+    when(identityToken.getUser()).thenReturn(user);
     when(validationService.isValidPassword(newPassword)).thenReturn(true);
     when(passwordEncoder.encode(newPassword)).thenReturn("encryptedPassword");
 

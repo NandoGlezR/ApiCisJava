@@ -2,7 +2,6 @@ package com.jala.university.api.application.service;
 
 import com.jala.university.api.application.dto.IdentityValidationTokenDto;
 import com.jala.university.api.application.dto.UserDto;
-import com.jala.university.api.domain.exceptions.user.UserNotFoundException;
 import java.security.InvalidParameterException;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -16,11 +15,8 @@ public interface TokenService {
    * @param expiration when the token will expire.
    * @param user owner of the token.
    * @return a new IdentityValidationTokenDto.
-   * @throws InvalidParameterException when expiration is less than or equal to the current time
-   * @throws UserNotFoundException when the user received doesn't exist
    */
-  IdentityValidationTokenDto createToken(LocalDateTime expiration, UserDto user)
-      throws InvalidParameterException, UserNotFoundException;
+  IdentityValidationTokenDto createToken(LocalDateTime expiration, UserDto user) throws InvalidParameterException;
 
   /**
    * Verifies the received token.
@@ -34,10 +30,10 @@ public interface TokenService {
   boolean verifyToken(UUID token);
 
   /**
-   * Search for the User that corresponds to the received UUID.
+   * Search for the IdentityValidationToken that corresponds to the received UUID.
    *
    * @param token token to be searched
    * @return an optional of IdentityValidationToken
    */
-  Optional<UserDto> getUserWithToken(UUID token);
+  Optional<IdentityValidationTokenDto> getToken(UUID token);
 }

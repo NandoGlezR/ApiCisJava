@@ -5,8 +5,10 @@ import com.jala.university.api.application.dto.UserDto;
 import com.jala.university.api.application.mapper.impl.UserMapper;
 import com.jala.university.api.application.service.impl.AuthServiceImpl;
 import com.jala.university.api.domain.entity.User;
+import com.jala.university.api.domain.entity.UserExt;
 import com.jala.university.api.domain.exceptions.authentication.InvalidAuthenticationCredentialsException;
 import com.jala.university.api.domain.exceptions.authentication.UserNotValidatedException;
+import com.jala.university.api.domain.repository.UserExtRepository;
 import com.jala.university.api.domain.repository.UserRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +19,8 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -29,6 +33,10 @@ public class AuthServiceTest {
 
   @Mock
   private PasswordEncoder passwordEncoder;
+
+  @Mock
+  private UserExtRepository userExtRepository;
+
 
   @Mock
   private UserMapper userMapper;
@@ -65,8 +73,6 @@ public class AuthServiceTest {
         .build();
 
     when(userRepository.findByLogin(user.getLogin())).thenReturn(user);
-    when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
-    user.setValidated(true);
     when(passwordEncoder.matches(user.getPassword(), user.getPassword())).thenReturn(true);
     when(userMapper.mapTo(user))
         .thenReturn(UserDto.builder().id(user.getId())
@@ -86,9 +92,7 @@ public class AuthServiceTest {
         .build();
 
     when(userRepository.findByLogin(user.getLogin())).thenReturn(user);
-    user.setValidated(true);
     when(passwordEncoder.matches(user.getPassword(), user.getPassword())).thenReturn(true);
-    when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
     when(userMapper.mapTo(user))
         .thenReturn(UserDto.builder().id(user.getId())
             .name(user.getName()).email(user.getLogin())
@@ -112,7 +116,7 @@ public class AuthServiceTest {
   }
 
   @Test
-  void testUserNotValidated() throws UserNotValidatedException {
+  void testUserNotValidated() {
     UserCredentials credentials = UserCredentials.builder()
         .login(user.getLogin())
         .password(user.getPassword())
@@ -120,7 +124,9 @@ public class AuthServiceTest {
 
     when(userRepository.findByLogin(user.getLogin())).thenReturn(user);
     when(passwordEncoder.matches(user.getPassword(), user.getPassword())).thenReturn(true);
-    when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+    UserExt userExt = UserExt.builder().user(user).validated(false).build();
+    when(userExtRepository.findByUser(user)).thenReturn(Optional.of(userExt));
 
     assertThrows(UserNotValidatedException.class, () -> authService.login(credentials));
   }
@@ -133,10 +139,10 @@ public class AuthServiceTest {
         .build();
 
     when(userRepository.findByLogin(user.getLogin())).thenReturn(user);
-    when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
     when(passwordEncoder.matches(user.getPassword(), user.getPassword())).thenReturn(true);
-    user.setValidated(true);
-    when(userRepository.findById(String.valueOf(user))).thenReturn(Optional.ofNullable(user));
+
+    UserExt userExt = UserExt.builder().user(user).validated(true).build();
+    when(userExtRepository.findByUser(user)).thenReturn(Optional.of(userExt));
 
     when(userMapper.mapTo(user))
             .thenReturn(UserDto.builder()
@@ -150,5 +156,6 @@ public class AuthServiceTest {
     assertNotNull(userDto);
     assertEquals(user.getLogin(), userDto.getEmail());
   }
+
 
 }

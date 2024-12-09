@@ -5,8 +5,6 @@ import com.jala.university.api.application.mapper.Mapper;
 import com.jala.university.api.domain.entity.IdentityValidationToken;
 import org.springframework.stereotype.Component;
 
-import java.util.UUID;
-
 @Component
 public class IdentityValidationTokenMapper implements
         Mapper<IdentityValidationToken, IdentityValidationTokenDto> {
@@ -22,7 +20,8 @@ public class IdentityValidationTokenMapper implements
     @Override
     public IdentityValidationToken mapFrom(IdentityValidationTokenDto dto) {
         return IdentityValidationToken.builder()
-                .id(UUID.fromString(dto.getToken()))
+                .id(dto.getToken())
+                .user(userMapper.mapFrom(dto.getUser()))
                 .expiration(dto.getExpiration())
                 .verified(dto.isVerified())
                 .build();
@@ -37,7 +36,8 @@ public class IdentityValidationTokenMapper implements
     @Override
     public IdentityValidationTokenDto mapTo(IdentityValidationToken entity) {
         return IdentityValidationTokenDto.builder()
-                .token(String.valueOf(entity.getId()))
+                .token(entity.getId())
+                .user(userMapper.mapTo(entity.getUser()))
                 .expiration(entity.getExpiration())
                 .verified(entity.isVerified())
                 .build();

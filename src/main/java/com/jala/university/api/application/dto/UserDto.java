@@ -32,7 +32,4 @@ public class UserDto {
   @JsonProperty(access = Access.WRITE_ONLY)
   @NotEmpty(message = "password must not be empty", groups = CreateGroup.class)
   private String password;
-
-  @JsonProperty(access = Access.READ_ONLY)
-  private boolean validated;
 }

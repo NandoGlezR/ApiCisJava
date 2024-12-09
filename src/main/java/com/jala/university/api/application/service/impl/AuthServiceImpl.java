@@ -5,14 +5,15 @@ import com.jala.university.api.application.dto.UserDto;
 import com.jala.university.api.application.mapper.impl.UserMapper;
 import com.jala.university.api.application.service.AuthServices;
 import com.jala.university.api.domain.entity.User;
+import com.jala.university.api.domain.entity.UserExt;
 import com.jala.university.api.domain.exceptions.authentication.InvalidAuthenticationCredentialsException;
 import com.jala.university.api.domain.exceptions.authentication.UserNotValidatedException;
+import com.jala.university.api.domain.repository.UserExtRepository;
 import com.jala.university.api.domain.repository.UserRepository;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
-import java.util.Optional;
 
 @Service
 public class AuthServiceImpl implements AuthServices {
@@ -20,12 +21,14 @@ public class AuthServiceImpl implements AuthServices {
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
   private final UserMapper userMapper;
+  private final UserExtRepository userExtRepository;
 
   @Autowired
-  public AuthServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, UserMapper userMapper) {
+  public AuthServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, UserMapper userMapper, UserExtRepository userExtRepository) {
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
     this.userMapper = userMapper;
+    this.userExtRepository = userExtRepository;
   }
 
   /**
@@ -64,7 +67,8 @@ public class AuthServiceImpl implements AuthServices {
    * If no UserExt is found for the user, it is assumed to be validated (returns true).
    */
   private boolean isValidated(User user) {
-    Optional<User> optionalUser = userRepository.findById(user.getId());
-    return optionalUser.map(User::isValidated).orElse(false);
+    Optional<UserExt> userExt = userExtRepository.findByUser(user);
+
+    return userExt.map(UserExt::isValidated).orElse(true);
   }
 }

@@ -1,18 +1,21 @@
 package com.jala.university.api.application.service.impl;
 
-import com.jala.university.api.application.dto.IdentityValidationTokenDto;
 import com.jala.university.api.application.dto.UserDto;
-import com.jala.university.api.application.mapper.impl.IdentityValidationTokenMapper;
+import com.jala.university.api.application.factories.IdentityTokenFactory;
 import com.jala.university.api.application.mapper.impl.UserMapper;
 import com.jala.university.api.application.service.EmailService;
 import com.jala.university.api.application.service.TokenService;
 import com.jala.university.api.application.service.UserService;
 import com.jala.university.api.application.service.ValidationService;
+import com.jala.university.api.domain.entity.IdentityValidationToken;
 import com.jala.university.api.domain.entity.User;
+import com.jala.university.api.domain.entity.UserExt;
 import com.jala.university.api.domain.exceptions.format.InvalidEmailFormatException;
 import com.jala.university.api.domain.exceptions.format.InvalidPasswordFormatException;
 import com.jala.university.api.domain.exceptions.user.UserAlreadyRegisteredException;
 import com.jala.university.api.domain.exceptions.user.UserNotFoundException;
+import com.jala.university.api.domain.repository.IdentityValidationTokenRepository;
+import com.jala.university.api.domain.repository.UserExtRepository;
 import com.jala.university.api.domain.repository.UserRepository;
 import jakarta.mail.MessagingException;
 import java.time.LocalDateTime;
@@ -28,23 +31,24 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
-    private final IdentityValidationTokenMapper tokenMapper;
     private final PasswordEncoder passwordEncoder;
     private final ValidationService validationService;
+    private final UserExtRepository userExtRepository;
+    private final IdentityValidationTokenRepository tokenRepository;
     private final TokenService tokenService;
     private final EmailService emailService;
 
     @Autowired
-    public UserServiceImpl(UserRepository userRepository,
-        PasswordEncoder passwordEncoder,
-        ValidationService validationService,
-        TokenService tokenService,
+    public UserServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder,
+        ValidationService validationService, UserExtRepository userExtRepository,
+        IdentityValidationTokenRepository tokenRepository, TokenService tokenService,
         EmailService emailService) {
         this.userRepository = userRepository;
         this.userMapper = new UserMapper();
-        this.tokenMapper = new IdentityValidationTokenMapper();
         this.passwordEncoder = passwordEncoder;
         this.validationService = validationService;
+        this.userExtRepository = userExtRepository;
+        this.tokenRepository = tokenRepository;
         this.tokenService = tokenService;
         this.emailService = emailService;
     }
@@ -85,13 +89,29 @@ public class UserServiceImpl implements UserService {
         }
 
         User userToBeCreated = userMapper.mapFrom(user);
+
         userToBeCreated.setId(UUID.randomUUID().toString());
         userToBeCreated.setPassword(passwordEncoder.encode(user.getPassword()));
-        userToBeCreated.setValidated(false);
+
         User newUser = userRepository.save(userToBeCreated);
+
+        createUserExt(newUser);
         sendTokenEmailToUser(newUser);
 
         return userMapper.mapTo(newUser);
+    }
+
+    /**
+     * Creates a UserExt entity for the given user with default values.
+     *
+     * @param user the User entity for which to create the UserExt.
+     */
+    private void createUserExt(User user) {
+        var createUserExt = UserExt.builder()
+            .user(user)
+            .validated(false)
+            .build();
+        userExtRepository.save(createUserExt);
     }
 
     /**
@@ -101,16 +121,13 @@ public class UserServiceImpl implements UserService {
      * @throws MessagingException if there is an issue sending the email.
      */
     private void sendTokenEmailToUser(User user) throws MessagingException {
+        IdentityTokenFactory factory = new IdentityTokenFactory();
+        IdentityValidationToken token = factory.create(LocalDateTime.now().plusHours(1), user);
 
-        try {
-            IdentityValidationTokenDto token = tokenService
-                .createToken(LocalDateTime.now().plusHours(1), userMapper.mapTo(user));
+        tokenRepository.save(token);
 
-            emailService.sendEmail(user.getLogin(), "Verify your identity",
-                token.getToken());
-        } catch (UserNotFoundException ignored) {
-
-        }
+        emailService.sendEmail(user.getLogin(), "Verify your identity",
+            token.getId().toString());
     }
 
     /**
@@ -143,11 +160,7 @@ public class UserServiceImpl implements UserService {
 
         if (userDto.getEmail() != null && !Objects.equals(userDto.getEmail(), optionalUser.get().getLogin())) {
             userDto.setId(optionalUser.get().getId());
-
-          User user = optionalUser.get();
-          user.setValidated(false);
-
-          userRepository.save(user);
+            updateUserExt(userDto);
             sendTokenEmailToUser(userMapper.mapFrom(userDto));
         }
 
@@ -184,6 +197,20 @@ public class UserServiceImpl implements UserService {
     }
 
     /**
+     * Updates the UserExt entity for the provided user.
+     *
+     * @param userDto the UserDto containing the user information to update.
+     */
+    private void updateUserExt(UserDto userDto) {
+        Optional<UserExt> optionalUserExt = userExtRepository.findByUser(userMapper.mapFrom(userDto));
+
+        UserExt userExt = optionalUserExt.get();
+
+        userExt.setValidated(false);
+        userExtRepository.save(userExt);
+    }
+
+    /**
      * Validates a user's email based on a provided token.
      *
      * @param token the UUID token used to validate the user's email.
@@ -192,13 +219,19 @@ public class UserServiceImpl implements UserService {
     @Override
     public boolean validateUserEmail(UUID token) {
         if (tokenService.verifyToken(token)) {
-            UserDto userDto = tokenService.getUserWithToken(token).get();
-            User user = userRepository.findById(userDto.getId()).get();
-            user.setValidated(true);
-            userRepository.save(user);
+            UserDto userDto = tokenService.getToken(token).get().getUser();
+
+            Optional<UserExt> optionalUserExt = userExtRepository.findByUser(
+                userMapper.mapFrom(userDto));
+
+            UserExt userExt = optionalUserExt.get();
+
+            userExt.setValidated(true);
+            userExtRepository.save(userExt);
 
             return true;
         }
+
         return false;
     }
 

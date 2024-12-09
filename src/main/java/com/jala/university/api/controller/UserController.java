@@ -147,7 +147,6 @@ public final class UserController {
     })
     @PostMapping("/login")
     public ResponseEntity<String> loginUser(@RequestBody UserCredentials credentials) {
-
         try {
             UserDto user = authService.login(credentials);
             String token = jwtTokenProvider.generateToken(user.getId());

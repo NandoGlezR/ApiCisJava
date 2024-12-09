@@ -1,28 +1,32 @@
 package com.jala.university.api.domain.entity;
 
 import jakarta.persistence.*;
-import java.util.ArrayList;
 import java.util.List;
 import lombok.*;
-import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document (collection = "users")
+@Entity
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
 @Setter
 @Builder
+@Table(name = "users")
 public class User {
   @Id
   private String id;
 
+  @Column(nullable = false)
   private String name;
 
+  @Column(nullable = false)
   private String login;
 
+  @Column(nullable = false)
   private String password;
 
-  private boolean validated;
+  @OneToMany(mappedBy = "user", targetEntity = IdentityValidationToken.class, fetch = FetchType.LAZY, cascade = CascadeType.REMOVE)
+  private List<IdentityValidationToken> tokens;
 
-  private List<IdentityValidationToken> tokens = new ArrayList<>();
+  @OneToOne(mappedBy = "user", fetch = FetchType.EAGER, targetEntity = UserExt.class, cascade = CascadeType.REMOVE)
+  private UserExt userExt;
 }

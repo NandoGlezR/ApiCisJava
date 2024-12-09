@@ -7,11 +7,10 @@ import com.jala.university.api.application.mapper.impl.IdentityValidationTokenMa
 import com.jala.university.api.application.mapper.impl.UserMapper;
 import com.jala.university.api.application.service.TokenService;
 import com.jala.university.api.domain.entity.IdentityValidationToken;
-import com.jala.university.api.domain.entity.User;
-import com.jala.university.api.domain.exceptions.user.UserNotFoundException;
-import com.jala.university.api.domain.repository.UserRepository;
+import com.jala.university.api.domain.repository.IdentityValidationTokenRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
 import java.security.InvalidParameterException;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -22,76 +21,59 @@ public class TokenServiceImpl implements TokenService {
 
     private IdentityValidationTokenMapper mapper;
     private UserMapper userMapper;
-    private UserRepository repository;
+    private IdentityValidationTokenRepository repository;
     private IdentityTokenFactory tokenFactory;
 
     @Autowired
     public TokenServiceImpl(IdentityValidationTokenMapper mapper,
                             UserMapper userMapper,
-                            UserRepository repository,
-                            IdentityTokenFactory tokenFactory) {
+                            IdentityValidationTokenRepository repository) {
         this.mapper = mapper;
         this.userMapper = userMapper;
         this.repository = repository;
-        this.tokenFactory = tokenFactory;
+        this.tokenFactory = new IdentityTokenFactory();
     }
 
     @Override
     public final IdentityValidationTokenDto createToken(LocalDateTime expiration, UserDto user)
-        throws InvalidParameterException, UserNotFoundException {
+            throws InvalidParameterException {
         if (expiration.isBefore(LocalDateTime.now()) || expiration.isEqual(LocalDateTime.now())) {
             throw new InvalidParameterException("Expiration time must be after now");
         }
 
-        Optional<User> optionalUser = Optional.ofNullable(repository.findByLogin(user.getEmail()));
+        IdentityValidationToken token = tokenFactory.create(expiration, userMapper.mapFrom(user));
 
-        if (optionalUser.isEmpty()) {
-          throw new UserNotFoundException("User not found");
-        }
-
-        User userOnDb = optionalUser.get();
-
-        IdentityValidationToken token = tokenFactory.create(expiration);
-
-        userOnDb.getTokens().add(token);
-        repository.save(userOnDb);
-
-        return mapper.mapTo(token);
+        return mapper.mapTo(repository.save(token));
     }
 
     @Override
     public final boolean verifyToken(UUID token) {
+        Optional<IdentityValidationToken> tokenOptional = repository.findById(token);
 
-      Optional<User> userOptional = repository.findUserWithToken(token);
-
-        if (userOptional.isEmpty()) {
+        if (tokenOptional.isEmpty()) {
             return false;
         }
 
-        IdentityValidationToken tokenEntity = userOptional.get()
-            .getTokens()
-            .stream()
-            .filter(identityValidationToken -> identityValidationToken.getId().equals(token))
-            .findFirst().get();
+        IdentityValidationToken tokenEntity = tokenOptional.get();
 
         if (tokenEntity.isVerified() || tokenEntity.getExpiration().isBefore(LocalDateTime.now())) {
             return false;
         }
 
         tokenEntity.setVerified(true);
-        repository.save(userOptional.get());
+        repository.save(tokenEntity);
 
         return true;
     }
 
     @Override
-    public final Optional<UserDto> getUserWithToken(UUID token) {
-        Optional<User> optionalUser = repository.findUserWithToken(token);
+    public final Optional<IdentityValidationTokenDto> getToken(UUID token) {
+        Optional<IdentityValidationToken> optionalToken = repository.findById(token);
 
-        if (optionalUser.isPresent()) {
-            User user = optionalUser.get();
+        if (optionalToken.isPresent()) {
+            IdentityValidationToken tokenEntity = optionalToken.get();
 
-            return Optional.of(userMapper.mapTo(user));
+            return Optional.of(mapper.mapTo(tokenEntity));
         }
 
         return Optional.empty();

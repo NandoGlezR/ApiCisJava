@@ -1,4 +1,4 @@
-# Capstone First Stage: Users API - Project of university
+# Capstone First Stage: Users API
 
 ## Initial Setup
 

@@ -2,14 +2,21 @@ package com.jala.university.api.application.service;
 
 import com.jala.university.api.application.dto.UserDto;
 import com.jala.university.api.application.dto.IdentityValidationTokenDto;
+import com.jala.university.api.application.mapper.impl.IdentityValidationTokenMapper;
+import com.jala.university.api.application.mapper.impl.UserMapper;
 import com.jala.university.api.application.service.impl.UserServiceImpl;
+import com.jala.university.api.domain.entity.IdentityValidationToken;
 import com.jala.university.api.domain.entity.User;
+import com.jala.university.api.domain.entity.UserExt;
 import com.jala.university.api.domain.exceptions.format.InvalidEmailFormatException;
 import com.jala.university.api.domain.exceptions.format.InvalidPasswordFormatException;
 import com.jala.university.api.domain.exceptions.user.UserAlreadyRegisteredException;
 import com.jala.university.api.domain.exceptions.user.UserNotFoundException;
+import com.jala.university.api.domain.repository.IdentityValidationTokenRepository;
+import com.jala.university.api.domain.repository.UserExtRepository;
 import com.jala.university.api.domain.repository.UserRepository;
 import jakarta.mail.MessagingException;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -31,6 +38,9 @@ class UserServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private UserExtRepository userExtRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
@@ -38,6 +48,9 @@ class UserServiceTest {
 
     @Mock
     private TokenService tokenService;
+
+    @Mock
+    private IdentityValidationTokenRepository tokenRepository;
 
     @Mock
     private EmailService emailService;
@@ -55,15 +68,24 @@ class UserServiceTest {
         String id = UUID.randomUUID().toString();
         user = User.builder().id(id).name("Kratos").login("sparta@gmail.com").password("A7@d4mB2").build();
         userDto = UserDto.builder().name("Kratos").email("sparta@gmail.com").password("A7@d4mB2").build();
-        tokenDto = IdentityValidationTokenDto.builder().token(String.valueOf(UUID.randomUUID())).build();
+        tokenDto = IdentityValidationTokenDto.builder().token(UUID.randomUUID()).user(userDto).build();
     }
 
     @Test
     void testCreateUserSuccess() throws InvalidPasswordFormatException, InvalidEmailFormatException,
-        UserAlreadyRegisteredException, MessagingException, UserNotFoundException {
+            UserAlreadyRegisteredException, MessagingException {
+        IdentityValidationTokenMapper tokenMapper = new IdentityValidationTokenMapper();
+
         when(passwordEncoder.encode(anyString())).thenReturn("A7@d4mB2");
         when(userRepository.save(any(User.class))).thenReturn(user);
-        when(tokenService.createToken(any(), any())).thenReturn(tokenDto);
+        when(tokenRepository.save(any(IdentityValidationToken.class)))
+            .thenAnswer(invocationOnMock -> {
+                IdentityValidationToken token = invocationOnMock.getArgument(0);
+
+                token.setId(UUID.randomUUID());
+
+                return token;
+            });
         doNothing().when(emailService).sendEmail(anyString(), anyString(), anyString());
 
         UserDto result = userService.createUser(userDto);
@@ -73,6 +95,7 @@ class UserServiceTest {
         assertEquals(user.getName(), result.getName());
         assertEquals(user.getLogin(), result.getEmail());
         verify(userRepository, times(1)).save(any(User.class));
+        verify(tokenRepository, times(1)).save(any(IdentityValidationToken.class));
         verify(emailService, times(1)).sendEmail(anyString(), anyString(), anyString());
     }
 
@@ -143,15 +166,13 @@ class UserServiceTest {
     @Test
     void testValidateUserEmailSuccess() {
         when(tokenService.verifyToken(any(UUID.class))).thenReturn(true);
-        userDto.setId(UUID.randomUUID().toString());
-        when(tokenService.getUserWithToken(any(UUID.class))).thenReturn(Optional.of(userDto));
-        user.setId(userDto.getId());
-        when(userRepository.findById(userDto.getId())).thenReturn(Optional.of(user));
+        when(tokenService.getToken(any(UUID.class))).thenReturn(Optional.of(tokenDto));
+        when(userExtRepository.findByUser(any(User.class))).thenReturn(Optional.of(new UserExt()));
 
         boolean result = userService.validateUserEmail(UUID.randomUUID());
 
         assertTrue(result);
-        verify(userRepository, times(1)).save(user);
+        verify(userExtRepository, times(1)).save(any(UserExt.class));
     }
 
     @Test
@@ -161,7 +182,7 @@ class UserServiceTest {
         boolean result = userService.validateUserEmail(UUID.randomUUID());
 
         assertFalse(result);
-        verify(userRepository, times(0)).save(user);
+        verify(userExtRepository, times(0)).save(any(UserExt.class));
     }
 }
 

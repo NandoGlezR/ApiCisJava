@@ -1,5 +1,13 @@
 package com.jala.university.api.domain.entity;
 
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -7,11 +15,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document
+@Entity
 @Getter
 @Setter
 @AllArgsConstructor
@@ -19,9 +24,13 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Builder
 public class IdentityValidationToken {
   @Id
+  @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
 
-  @Indexed(expireAfterSeconds = 0)
+  @ManyToOne(targetEntity = User.class, fetch = FetchType.LAZY, cascade = CascadeType.REMOVE)
+  @JoinColumn(nullable = false)
+  private User user;
+
   private LocalDateTime expiration;
 
   private boolean verified = false;
